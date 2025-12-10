@@ -1,4 +1,4 @@
-🚀 PayPal Clone – Backend (Microservices Architecture)
+🚀 Smartpay - PayPal Clone – Backend (Microservices Architecture)
 
 A production-style Fintech payment wallet system inspired by PayPal, built using Spring Boot Microservices, following the PayPal Clone Series by Mrunmai Dahare.
 This project simulates real-world payment flows: wallet creation, holds, captures, debits, credits, rewards, notifications, and transaction management — all using event-driven architecture with Kafka.

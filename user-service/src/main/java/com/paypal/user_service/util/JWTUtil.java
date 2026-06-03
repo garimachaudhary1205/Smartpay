@@ -18,7 +18,10 @@ import java.util.Map;
 
 @Component
 public class JWTUtil {
-    private static final String SECRET = "secret123secret123secret123secret123secret123secret123";
+    // Read from JWT_SECRET env var in production; falls back to the dev default
+    // so local runs work unchanged. Must match the api-gateway secret.
+    private static final String SECRET = System.getenv().getOrDefault(
+            "JWT_SECRET", "secret123secret123secret123secret123secret123secret123");
 
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(SECRET.getBytes());

@@ -31,6 +31,10 @@ public class Reward {
     public LocalDateTime getSentAt() { return sentAt; }
     public void setSentAt(LocalDateTime timestamp) { this.sentAt = timestamp; }
 
+    public Long getTransactionId() {
+        return transactionId;
+    }
+
     public void setTransactionId(Long id) {
         transactionId = id;
     }

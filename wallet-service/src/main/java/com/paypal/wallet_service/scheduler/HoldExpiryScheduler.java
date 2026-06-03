@@ -27,7 +27,7 @@ public class HoldExpiryScheduler {
         LocalDateTime now = LocalDateTime.now();
 
         // simple: fetch expired active holds (OK for small data sets)
-        List<WalletHold> expired = walletHoldRepository.findByStatusAndExpiresAtBefore("ACTIVE", now);
+        List<WalletHold> expired = walletHoldRepository.findByStatusAndExpiredAtBefore("ACTIVE", now);
 
         for (WalletHold hold : expired) {
             String ref = hold.getHoldReference();

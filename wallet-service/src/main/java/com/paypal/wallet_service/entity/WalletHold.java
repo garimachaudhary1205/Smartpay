@@ -22,7 +22,7 @@ public class WalletHold {
     private Long amount;
 
     @Column(nullable = false)
-    private String Status = "ACTIVE";
+    private String status = "ACTIVE";
 
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime expiredAt;
@@ -53,10 +53,10 @@ public class WalletHold {
         this.amount = amount;
     }
     public String getStatus() {
-        return Status;
+        return status;
     }
     public void setStatus(String status) {
-        Status = status;
+        this.status = status;
     }
     public LocalDateTime getCaratedAt() {
         return createdAt;

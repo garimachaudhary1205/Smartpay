@@ -1,0 +1,15 @@
+[Unit]
+Description=NexPay API Gateway
+After=network.target nexpay-user.service nexpay-transaction.service nexpay-wallet.service nexpay-notification.service nexpay-reward.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/nexpay
+EnvironmentFile=-/opt/nexpay/nexpay.env
+ExecStart=/usr/bin/java -jar /opt/nexpay/api-gateway.jar
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

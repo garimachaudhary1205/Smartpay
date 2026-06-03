@@ -45,8 +45,10 @@ public class WalletService {
                 ", amount=" + request.getAmount() +
                 ", currency=" + request.getCurrency());
 
+        // Auto-provision an INR wallet on first credit so "Add Funds" works
+        // for users who don't yet have a wallet.
         Wallet wallet = walletRepository.findByUserIdAndCurrency(request.getUserId(), "INR")
-                .orElseThrow(() -> new NotFoundException("Wallet not found for user: " + request.getUserId()));
+                .orElseGet(() -> walletRepository.save(new Wallet(request.getUserId(), "INR")));
 
         wallet.setBalance(wallet.getBalance() + request.getAmount());
         wallet.setAvailableBalance(wallet.getAvailableBalance() + request.getAmount());

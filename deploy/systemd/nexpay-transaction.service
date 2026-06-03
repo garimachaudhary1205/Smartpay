@@ -1,0 +1,15 @@
+[Unit]
+Description=NexPay Transaction Service
+After=network.target nexpay-wallet.service nexpay-reward.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/nexpay
+EnvironmentFile=-/opt/nexpay/nexpay.env
+ExecStart=/usr/bin/java -jar /opt/nexpay/transaction-service.jar
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

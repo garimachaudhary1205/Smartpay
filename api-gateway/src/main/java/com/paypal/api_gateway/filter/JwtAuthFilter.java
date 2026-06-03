@@ -6,7 +6,9 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -26,51 +28,51 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
         String path = exchange.getRequest().getPath().value();
         String normalizedPath = path.replaceAll("/+$", "");
 
-        System.out.println("🔍 Incoming path: " + path);
-        System.out.println("📦 Normalized path: " + normalizedPath);
+        // Let CORS preflight requests through untouched
+        if (exchange.getRequest().getMethod() == HttpMethod.OPTIONS) {
+            return chain.filter(exchange);
+        }
 
         // Skip JWT check for public paths
         if (PUBLIC_PATHS.contains(normalizedPath)) {
-            System.out.println("🟢 Skipping JWT for public path: " + normalizedPath);
-            return chain.filter(exchange)
-                    .doOnSubscribe(s -> System.out.println("➡️ Proceeding without JWT for public path"))
-                    .doOnSuccess(v -> System.out.println("✅ Successfully passed public path without JWT"))
-                    .doOnError(e -> System.err.println("❌ Error during public path filter chain: " + e.getMessage()));
+            return chain.filter(exchange);
         }
 
-        // Extract Authorization header once
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        System.out.println("🔑 Authorization header found: " + true);
 
-        if (!authHeader.startsWith("Bearer ")) {
-            System.err.println("❌ Missing or invalid Authorization header");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            System.err.println("❌ Missing or invalid Authorization header for " + normalizedPath);
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 
         try {
             String token = authHeader.substring(7);
-            System.out.println("🔐 JWT token extracted from header: " + token);
-
-            // DEBUG: replace <your_expected_token_here> with actual token for debugging only
-            String expectedToken = "<your_expected_token_here>";
-            System.out.println("💡 Comparing tokens:");
-            System.out.println("Expected token: " + expectedToken);
-            System.out.println("Extracted token: " + token);
-
             Claims claims = JwtUtil.validateToken(token);
-            System.out.println("✅ JWT validated successfully. Claims subject: " + claims.getSubject());
 
-            // Add user email to headers for downstream services
-            exchange.getRequest().mutate()
-                    .header("X-User-Email", claims.getSubject())
+            String email = claims.getSubject();
+            Object userId = claims.get("userId");
+            Object role = claims.get("role");
+
+            // Forward identity to downstream services. NOTE: the mutated
+            // request must be applied to the exchange, otherwise the headers
+            // are silently dropped.
+            ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate();
+            if (email != null) {
+                requestBuilder.header("X-User-Email", email);
+            }
+            if (userId != null) {
+                requestBuilder.header("X-User-Id", String.valueOf(userId));
+            }
+            if (role != null) {
+                requestBuilder.header("X-User-Role", String.valueOf(role));
+            }
+            ServerWebExchange mutatedExchange = exchange.mutate()
+                    .request(requestBuilder.build())
                     .build();
-            System.out.println("➡️ Added X-User-Email header to request: " + claims.getSubject());
 
-            return chain.filter(exchange)
-                    .doOnSubscribe(s -> System.out.println("➡️ Proceeding with JWT authenticated request"))
-                    .doOnSuccess(v -> System.out.println("✅ Successfully passed JWT auth filter"))
-                    .doOnError(e -> System.err.println("❌ Error during authenticated filter chain: " + e.getMessage()));
+            System.out.println("✅ JWT validated for " + email + " (userId=" + userId + ") → " + normalizedPath);
+            return chain.filter(mutatedExchange);
 
         } catch (Exception e) {
             System.err.println("❌ JWT validation failed: " + e.getMessage());

@@ -49,7 +49,7 @@ public class TransactionServiceImpl implements TransactionService {
         Transaction savedTransaction = repository.save(request);
         System.out.println("📥 Transaction PENDING saved: " + savedTransaction);
 
-        String walletServiceUrl = "http://localhost:8088/api/v1/wallets"; // wallet service base URL
+        String walletServiceUrl = "http://localhost:8083/api/v1/wallets"; // wallet service base URL
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
 
@@ -74,27 +74,9 @@ public class TransactionServiceImpl implements TransactionService {
             holdReference = holdNode.get("holdReference").asText();
             System.out.println("🛑 Hold placed: " + holdReference);
 
-            // NEW: check receiver wallet exists BEFORE capture
-            try {
-                ResponseEntity<String> receiverCheck = restTemplate.getForEntity(walletServiceUrl + "/" + receiverId, String.class);
-                if (!receiverCheck.getStatusCode().is2xxSuccessful()) {
-                    // release hold and fail the transaction
-                    tryReleaseHold(walletServiceUrl, holdReference, headers);
-                    System.out.println("🔄 Receiver wallet missing → hold released: " + holdReference);
-                    savedTransaction.setStatus("FAILED");
-                    savedTransaction = repository.save(savedTransaction);
-                    System.out.println("❌ Transaction FAILED (receiver wallet missing): " + savedTransaction);
-                    return savedTransaction;
-                }
-            } catch (HttpClientErrorException hx) {
-                // receiver not found or other 4xx
-                System.err.println("❌ Receiver wallet check failed: " + hx.getResponseBodyAsString());
-                tryReleaseHold(walletServiceUrl, holdReference, headers);
-                savedTransaction.setStatus("FAILED");
-                savedTransaction = repository.save(savedTransaction);
-                System.out.println("❌ Transaction FAILED (receiver check error): " + savedTransaction);
-                return savedTransaction;
-            }
+            // Receiver wallet is auto-provisioned by the wallet service's credit
+            // endpoint (Step 3), so no pre-check is needed. Money can be sent to
+            // any registered user even if they have not added funds yet.
 
             // Step 2: Capture hold → debit sender wallet
             String captureJson = String.format("{\"holdReference\": \"%s\"}", holdReference);
@@ -150,6 +132,21 @@ public class TransactionServiceImpl implements TransactionService {
             savedTransaction.setStatus("SUCCESS");
             savedTransaction = repository.save(savedTransaction);
             System.out.println("✅ Transaction SUCCESS: " + savedTransaction);
+
+            // Step 5: Award reward points to the sender via direct REST call
+            // (decoupled from Kafka so rewards work without a running broker).
+            try {
+                String rewardUrl = "http://localhost:8089/api/rewards/";
+                String rewardJson = String.format(
+                        "{\"userId\": %d, \"transactionId\": %d, \"amount\": %.2f}",
+                        senderId, savedTransaction.getId(), amount);
+                HttpEntity<String> rewardEntity = new HttpEntity<>(rewardJson, headers);
+                restTemplate.postForEntity(rewardUrl, rewardEntity, String.class);
+                System.out.println("🎁 Reward created for sender " + senderId);
+            } catch (Exception rewardEx) {
+                // Reward failure must not fail the transaction
+                System.err.println("❌ Failed to create reward: " + rewardEx.getMessage());
+            }
 
         } catch (HttpClientErrorException e) {
             System.err.println("❌ Wallet service returned error: " + e.getResponseBodyAsString());

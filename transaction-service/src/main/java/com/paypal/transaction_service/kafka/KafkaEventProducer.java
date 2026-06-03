@@ -28,17 +28,23 @@ public class KafkaEventProducer {
         this.objectMapper.registerModule(new JavaTimeModule());
     }
     public void sendTransactionEvent(String key, Transaction transaction) {
-        System.out.println("📤 Sending to Kafka → Topic: " + TOPIC + ", Key: " + key + ", Message: " + transaction);
-
-        CompletableFuture<SendResult<String, Transaction>> future = kafkaTemplate.send(TOPIC, key, transaction);
-
-        future.thenAccept(result -> {
-            RecordMetadata metadata = result.getRecordMetadata();
-            System.out.println("✅ Kafka message sent successfully! Topic: " + metadata.topic() + ", Partition: " + metadata.partition() + ", Offset: " + metadata.offset());
-        }).exceptionally(ex -> {
-            System.err.println("❌ Failed to send Kafka message: " + ex.getMessage());
-            ex.printStackTrace();
-            return null;
+        // Run the whole send on a background thread. kafkaTemplate.send() blocks
+        // the calling thread while fetching broker metadata (up to max.block.ms),
+        // which would otherwise stall the HTTP response when Kafka is down.
+        CompletableFuture.runAsync(() -> {
+            System.out.println("📤 Sending to Kafka → Topic: " + TOPIC + ", Key: " + key + ", Message: " + transaction);
+            try {
+                CompletableFuture<SendResult<String, Transaction>> future = kafkaTemplate.send(TOPIC, key, transaction);
+                future.thenAccept(result -> {
+                    RecordMetadata metadata = result.getRecordMetadata();
+                    System.out.println("✅ Kafka message sent successfully! Topic: " + metadata.topic() + ", Partition: " + metadata.partition() + ", Offset: " + metadata.offset());
+                }).exceptionally(ex -> {
+                    System.err.println("❌ Failed to send Kafka message: " + ex.getMessage());
+                    return null;
+                });
+            } catch (Exception e) {
+                System.err.println("❌ Kafka unavailable, skipping event: " + e.getMessage());
+            }
         });
     }
 }

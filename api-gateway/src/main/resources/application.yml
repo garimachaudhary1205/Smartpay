@@ -11,6 +11,23 @@ spring:
         webflux:
           default-filters:
             - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                # allowedOriginPatterns supports wildcards together with
+                # allowCredentials=true (plain "*" is not allowed with creds).
+                allowedOriginPatterns:
+                  - "http://localhost:3000"        # local dev
+                  - "https://*.vercel.app"         # Vercel deploys (preview + prod)
+                  # - "https://nexpay.your-domain.com"  # add your custom frontend domain
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                allowCredentials: true
           routes:
 
             # 🔐 User Auth (Signup/Login)
@@ -31,9 +48,15 @@ spring:
               predicates:
                 - Path=/api/transactions/**
 
+            # 💰 Wallet Service
+            - id: wallet-service
+              uri: http://localhost:8083
+              predicates:
+                - Path=/api/v1/wallets/**
+
             # 🎁 Reward Service
             - id: reward-service
-              uri: http://localhost:8085
+              uri: http://localhost:8089
               predicates:
                 - Path=/api/rewards/**
 
@@ -41,7 +64,7 @@ spring:
             - id: notification-service
               uri: http://localhost:8084
               predicates:
-                - Path=/api/notifications/**
+                - Path=/api/notify/**
 
   jwt:
     secret: my-super-secret-key-that-you-never-share
